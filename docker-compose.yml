@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------
+  # Base de données PostgreSQL
+  # --------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: my-service-db
+    environment:
+      POSTGRES_DB: myservicedb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5433:5432" # Remappe sur 5433 localement pour éviter les conflits
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myservicedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------
+  # Backend Spring Boot
+  # --------------------------------------------------
+  my-service-backend:
+    build:
+      context: ../my-service # Remonte d'un cran vers le dossier backend
+      dockerfile: Dockerfile
+    container_name: my-service-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/myservicedb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+    ports:
+      - "8082:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy # Attend que la BDD soit réellement prête
+    networks:
+      - app-network
+
+  # --------------------------------------------------
+  # Frontend Angular + Nginx
+  # --------------------------------------------------
+  my-service-frontend:
+    build:
+      context: ../my-service-ui # Remonte d'un cran vers le dossier frontend
+      dockerfile: Dockerfile
+    container_name: my-service-frontend
+    ports:
+      - "80:80" # Accessible directement sur http://localhost
+    depends_on:
+      - my-service-backend
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
