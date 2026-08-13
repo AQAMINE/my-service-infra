@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
     ports:
-      - "5433:5432"
+      - "5435:5432"  
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -29,16 +29,36 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.1.0
     container_name: myservice-keycloak
-    command: start-dev --import-realm
+    command: start-dev --import-realm --insecure
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HTTP_PORT: 8080
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME_STRICT: "false"
     ports:
-      - "8080:8080"
+      - "8085:8080"
     volumes:
-      # - ./imports:/opt/keycloak/data/import
       - keycloak_data:/opt/keycloak/data
+      - keycloak_imports:/opt/keycloak/data/import
+    networks:
+      - app-network
+
+  # --------------------------------------------------
+  # Microservice Python gRPC (Chiffrement AES-GCM)
+  # --------------------------------------------------
+  my-service-crypto:
+    build:
+      context: ../my-service-crypto
+      dockerfile: Dockerfile
+    container_name: my-service-crypto
+    environment:
+      PYTHONUNBUFFERED: "1"
+      GRPC_PORT: 50051
+      CRYPTO_SECRET_KEY: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+    ports:
+      - "50051:50051"
     networks:
       - app-network
 
@@ -54,14 +74,17 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/myservicedb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgrespassword
-      # Configuration de l'Issuer Keycloak via le nom du service Docker
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-realm
+      GRPC_CLIENT_CRYPTO_HOST: my-service-crypto
+      GRPC_CLIENT_CRYPTO_PORT: 50051
     ports:
       - "8082:8081"
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
+        condition: service_started
+      my-service-crypto:
         condition: service_started
     networks:
       - app-network
@@ -84,6 +107,7 @@ services:
 volumes:
   postgres_data:
   keycloak_data:
+  keycloak_imports:
 
 networks:
   app-network:
