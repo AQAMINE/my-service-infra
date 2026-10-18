@@ -156,10 +156,25 @@ services:
     networks:
       - app-network
 
+  # --------------------------------------------------
+  # Redis (Cache)
+  # --------------------------------------------------
+  redis: 
+    image: redis:7-alpine
+    container_name: my-service-redis
+    command: redis-server --requirepass redispassword
+    ports:
+      - "6379:6379" 
+    volumes: 
+      - redis_data:/data
+    networks:    
+      - app-network
+
 volumes:
   postgres_data:
   keycloak_data:
   keycloak_imports:
+  redis_data:
 
 networks:
   app-network:
