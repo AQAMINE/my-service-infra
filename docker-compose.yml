@@ -63,7 +63,7 @@ services:
       - app-network
 
   # --------------------------------------------------
-  # Backend Spring Boot
+  # Backend Spring Boot Main (Passwords)
   # --------------------------------------------------
   my-service-backend:
     build:
@@ -74,7 +74,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/myservicedb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgrespassword
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-realm
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-service-realm
       GRPC_CLIENT_CRYPTO_HOST: my-service-crypto
       GRPC_CLIENT_CRYPTO_PORT: 50051
     ports:
@@ -85,6 +85,56 @@ services:
       keycloak:
         condition: service_started
       my-service-crypto:
+        condition: service_started
+    networks:
+      - app-network
+
+  # --------------------------------------------------
+  # Microservice Cards (Bank Cards Vault)
+  # --------------------------------------------------
+  my-service-cards:
+    build:
+      context: ../my-service-cards
+      dockerfile: Dockerfile
+    container_name: my-service-cards
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/my_cards_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-service-realm
+      GRPC_CLIENT_CRYPTO_HOST: my-service-crypto
+      GRPC_CLIENT_CRYPTO_PORT: 50051
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      my-service-crypto:
+        condition: service_started
+    networks:
+      - app-network
+
+  # --------------------------------------------------
+  # Microservice Tasks (Kanban / Task Manager)
+  # --------------------------------------------------
+  my-service-tasks:
+    build:
+      context: ../my-service-tasks
+      dockerfile: Dockerfile
+    container_name: my-service-tasks
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/my_tasks_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-service-realm
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_started
     networks:
       - app-network
@@ -101,6 +151,8 @@ services:
       - "80:80"
     depends_on:
       - my-service-backend
+      - my-service-cards
+      - my-service-tasks
     networks:
       - app-network
 
@@ -112,30 +164,3 @@ volumes:
 networks:
   app-network:
     driver: bridge
-
-    # --------------------------------------------------
-  # Microservice Cards (Spring Boot)
-  # --------------------------------------------------
-  my-service-cards:
-    build:
-      context: ../my-service-cards
-      dockerfile: Dockerfile
-    container_name: my-service-cards
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/my_cards_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgrespassword
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/my-service-realm
-      GRPC_CLIENT_CRYPTO_HOST: my-service-crypto
-      GRPC_CLIENT_CRYPTO_PORT: 50051
-    ports:
-      - "8083:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      keycloak:
-        condition: service_started
-      my-service-crypto:
-        condition: service_started
-    networks:
-      - app-network
